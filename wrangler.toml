@@ -1,0 +1,6 @@
+name = "kenzai-kaitori-jp"
+compatibility_date = "2026-06-18"
+
+[assets]
+directory = "./"
+not_found_handling = "404-page"
