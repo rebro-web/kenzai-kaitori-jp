@@ -21,11 +21,12 @@
 // サイト固有設定
 // ============================================
 const SITE_NAME    = '建材・住宅設備の買取専門店レコテック';
+const SITE_SHORT   = 'レコテック';
 const SITE_DOMAIN  = 'kenzai-kaitori.jp';
-const FROM_EMAIL   = 'onboarding@resend.dev'; // Resendサンドボックスドメイン（独自ドメイン認証後に変更）
-const FROM_NAME    = '建材・住宅設備の買取専門店レコテック';
+const FROM_EMAIL   = 'onboarding@resend.dev'; // Resendサンドボックスドメイン（独自ドメイン認証後に info@kenzai-kaitori.jp に変更）
+const FROM_NAME    = 'レコテック';
 const ADMIN_EMAILS = ['info@kenzai-kaitori.jp', 'rebro.web@gmail.com'];
-const THANKS_PAGE  = '/form/thanks/';
+const THANKS_PAGE  = '/thanks/';
 const ERROR_PAGE   = '/form/error/';
 
 
@@ -106,12 +107,13 @@ export async function onRequest(context) {
     return redirect(ERROR_PAGE + '?reason=config');
   }
 
-  const productsText = formatProducts(products);
   const now = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
 
-  // 管理者通知メール
-  const adminSubject = '【匿名査定フォーム】お問い合わせがありました';
-  const adminBody    = buildAdminBody({ now, name, email, message, productsText });
+  // Contact Form 7の件名フォーマットを再現
+  // 例: 「レコテックへ◯◯様から匿名査定がありました。商品：◯◯」
+  const firstProductName = products[0]?.product || '（商品名未入力）';
+  const adminSubject = `${SITE_SHORT}へ${name}様から匿名査定がありました。商品：${firstProductName}`;
+  const adminBody    = buildAdminBody({ now, name, email, message, products });
 
   await sendMail(apiKey, {
     from: `${FROM_NAME} <${FROM_EMAIL}>`,
@@ -122,8 +124,8 @@ export async function onRequest(context) {
   });
 
   // 自動返信メール（送信者宛）
-  const replySubject = `【${SITE_NAME}】査定依頼を受け付けました`;
-  const replyBody    = buildReplyBody({ name, email, message, productsText });
+  const replySubject = `【${SITE_SHORT}】査定依頼を受け付けました`;
+  const replyBody    = buildReplyBody({ name, email, message, products });
 
   await sendMail(apiKey, {
     from: `${FROM_NAME} <${FROM_EMAIL}>`,
@@ -196,67 +198,52 @@ function redirect(location) {
   });
 }
 
-// 商品情報を文字列化
-function formatProducts(products) {
+// 商品情報を Contact Form 7 風に整形（【商品1】メーカー：◯◯ 商品名：◯◯ …）
+function formatProductsCF7(products) {
   if (products.length === 0) return '（商品情報の入力なし）';
   return products.map((p, i) => {
-    let s = `■商品${i + 1}\n`;
-    if (p.maker)     s += `　メーカー: ${p.maker}\n`;
-    if (p.product)   s += `　商品名: ${p.product}\n`;
-    if (p.jan)       s += `　JAN・型番: ${p.jan}\n`;
-    if (p.qty)       s += `　数量: ${p.qty}\n`;
-    if (p.condition) s += `　商品状態: ${p.condition}\n`;
-    return s;
-  }).join('\n');
+    return [
+      `【商品${i + 1}】`,
+      `メーカー：${p.maker || ''}`,
+      `商品名：${p.product || ''}`,
+      `JAN・型番：${p.jan || ''}`,
+      `数量：${p.qty || ''}`,
+      `商品状態：${p.condition || ''}`,
+    ].join('\n');
+  }).join('\n\n');
 }
 
-// 管理者宛メール本文
-function buildAdminBody({ now, name, email, message, productsText }) {
-  return `${SITE_NAME} の匿名査定フォームから新しい依頼がありました。
+// 管理者宛メール本文（Contact Form 7のテンプレ風）
+function buildAdminBody({ now, name, email, message, products }) {
+  const productsText = formatProductsCF7(products);
+  return `お名前：${name}
+メールアドレス：${email}
+備考・買取希望価格：${message || ''}
 
-────────────────────
-■受信日時
-${now}
-
-■お名前
-${name}
-
-■メールアドレス
-${email}
-
-■備考
-${message || '（なし）'}
-
-────────────────────
-■商品情報
-────────────────────
 ${productsText}
-────────────────────`;
+
+--
+受信日時：${now}
+このメールはサイトのフォーム経由で送信されました。
+返信は送信元（${email}）に送られます。`;
 }
 
-// 自動返信メール本文（送信者向け）
-function buildReplyBody({ name, email, message, productsText }) {
+// 自動返信メール本文（送信者向け・Contact Form 7のテンプレ風）
+function buildReplyBody({ name, email, message, products }) {
+  const productsText = formatProductsCF7(products);
   return `${name} 様
 
-この度は ${SITE_NAME} へお問い合わせいただき、誠にありがとうございます。
-以下の内容で査定依頼を受け付けました。
+この度は ${SITE_NAME} の匿名査定フォームへ
+お申し込みいただきまして、誠にありがとうございます。
 
+下記の内容で査定依頼を承りました。
 担当者より2営業日以内にご連絡させていただきます。
-今しばらくお待ちくださいませ。
 
 ────────────────────
-■お名前
-${name}
+お名前：${name}
+メールアドレス：${email}
+備考・買取希望価格：${message || ''}
 
-■メールアドレス
-${email}
-
-■備考
-${message || '（なし）'}
-
-────────────────────
-■商品情報
-────────────────────
 ${productsText}
 ────────────────────
 
