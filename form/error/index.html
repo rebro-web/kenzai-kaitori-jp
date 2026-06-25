@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>送信エラー | 建材・住宅設備の買取専門店レコテック</title>
+<style>
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Meiryo", sans-serif;
+  background: #f7f7f7;
+  margin: 0;
+  padding: 40px 16px;
+  color: #333;
+  line-height: 1.7;
+}
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+  background: #fff;
+  padding: 48px 32px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+h1 {
+  text-align: center;
+  font-size: 24px;
+  margin: 0 0 24px;
+  color: #c83e3e;
+}
+.icon {
+  text-align: center;
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+p { margin: 0 0 16px; }
+.reason {
+  background: #fff5f5;
+  border-left: 4px solid #c83e3e;
+  padding: 12px 16px;
+  margin: 16px 0;
+  font-size: 14px;
+}
+.btn {
+  display: inline-block;
+  margin-top: 24px;
+  padding: 14px 32px;
+  background: #2a7a3a;
+  color: #fff !important;
+  text-decoration: none;
+  border-radius: 6px;
+  font-weight: bold;
+}
+.btn-wrap { text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="icon">⚠️</div>
+  <h1>送信に失敗しました</h1>
+  <p>申し訳ございません。フォームの送信処理でエラーが発生しました。</p>
+  <p>お手数ですが、もう一度入力フォームから送信をお試しください。</p>
+
+  <div id="reason-box" class="reason" style="display:none;">
+    <strong>エラー内容：</strong><span id="reason-text"></span>
+  </div>
+
+  <p>同じエラーが続く場合は、お電話または下記メールアドレスまでお問い合わせください。</p>
+  <p><strong>info@kenzai-kaitori.jp</strong></p>
+
+  <div class="btn-wrap">
+    <a href="/form/" class="btn">フォームへ戻る</a>
+  </div>
+</div>
+
+<script>
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var reason = params.get('reason');
+  if (!reason) return;
+  var map = {
+    'method':   '直接アクセスは許可されていません（フォームから送信してください）',
+    'referer':  '送信元の確認に失敗しました',
+    'parse':    '入力内容の読み取りに失敗しました',
+    'config':   'サーバー設定エラー（管理者にご連絡ください）',
+  };
+  var text = map[reason] || decodeURIComponent(reason).replace(/\|/g, '、');
+  document.getElementById('reason-text').textContent = text;
+  document.getElementById('reason-box').style.display = 'block';
+})();
+</script>
+</body>
+</html>
