@@ -144,24 +144,13 @@ export async function onRequest(context) {
     text: replyBody,
   });
 
-  // デバッグモードならResendのレスポンスをそのまま返す
-  if (debugMode) {
-    return new Response(JSON.stringify({
-      ok: true,
-      admin_result: adminResult,
-      reply_result: replyResult,
-      from_email: FROM_EMAIL,
-      admin_emails: ADMIN_EMAILS,
-      reply_to: email,
-    }, null, 2), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  // デバッグモードならレスポンスを返す（GAS結果は後段で含める）
+  const willReturnDebug = debugMode;
 
   // ============================================
   // スプレッドシート記録（GAS WebApp）
   // ============================================
+  let gasResult = { skipped: true };
   if (env.GAS_URL && env.GAS_TOKEN) {
     const gasProducts = products.map(p => ({
       maker:     p.maker,
@@ -182,14 +171,37 @@ export async function onRequest(context) {
       products:  gasProducts,
     };
 
-    // 失敗してもメール送信は完了扱いにするため await はするが結果は無視
     try {
-      await fetch(env.GAS_URL, {
+      const res = await fetch(env.GAS_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        redirect: 'follow',
       });
-    } catch (e) { /* ignore */ }
+      const text = await res.text();
+      let body;
+      try { body = JSON.parse(text); } catch { body = text.substring(0, 500); }
+      gasResult = { status: res.status, body, gas_url_set: true, token_set: !!env.GAS_TOKEN };
+    } catch (e) {
+      gasResult = { error: e.message, gas_url_set: true };
+    }
+  } else {
+    gasResult = { skipped: true, gas_url_set: !!env.GAS_URL, token_set: !!env.GAS_TOKEN };
+  }
+
+  if (willReturnDebug) {
+    return new Response(JSON.stringify({
+      ok: true,
+      admin_result: adminResult,
+      reply_result: replyResult,
+      gas_result: gasResult,
+      from_email: FROM_EMAIL,
+      admin_emails: ADMIN_EMAILS,
+      reply_to: email,
+    }, null, 2), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   return redirect(THANKS_PAGE);
