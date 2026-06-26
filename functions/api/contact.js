@@ -25,7 +25,10 @@ const SITE_SHORT   = 'レコテック';
 const SITE_DOMAIN  = 'kenzai-kaitori.jp';
 const FROM_EMAIL   = 'onboarding@resend.dev'; // Resendサンドボックスドメイン（独自ドメイン認証後に info@kenzai-kaitori.jp に変更）
 const FROM_NAME    = 'レコテック';
-const ADMIN_EMAILS = ['info@kenzai-kaitori.jp', 'rebro.web@gmail.com'];
+// Resendドメイン認証完了までは rebro.web@gmail.com のみ
+// 認証完了後に ['info@kenzai-kaitori.jp', 'rebro.web@gmail.com'] へ戻す
+const ADMIN_EMAILS = ['rebro.web@gmail.com'];
+const VERIFIED_TESTING_EMAIL = 'rebro.web@gmail.com'; // Resend制約：これ以外には送れない
 const THANKS_PAGE  = '/thanks/';
 const ERROR_PAGE   = '/form/error/';
 
@@ -131,10 +134,13 @@ export async function onRequest(context) {
   const replySubject = `【${SITE_SHORT}】査定依頼を受け付けました`;
   const replyBody    = buildReplyBody({ name, email, message, products });
 
+  // 自動返信は送信者宛だが、Resendサンドボックス制約により
+  // 検証済みアドレス以外には送信できない。それ以外は管理者宛にCCする形で代替
+  const replyTo = (email === VERIFIED_TESTING_EMAIL) ? email : VERIFIED_TESTING_EMAIL;
   const replyResult = await sendMail(apiKey, {
     from: `${FROM_NAME} <${FROM_EMAIL}>`,
-    to: [email],
-    subject: replySubject,
+    to: [replyTo],
+    subject: replySubject + (email === VERIFIED_TESTING_EMAIL ? '' : `（本来宛先: ${email}）`),
     text: replyBody,
   });
 
