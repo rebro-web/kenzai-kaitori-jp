@@ -55,10 +55,11 @@ export async function onRequest(context) {
     }
   }
 
-  // フォームデータを取得
+  // フォームデータを取得（UTF-8で確実に解釈するため、生テキスト→URLSearchParams）
   let formData;
   try {
-    formData = await request.formData();
+    const bodyText = await request.text();
+    formData = new URLSearchParams(bodyText);
   } catch (err) {
     return redirect(ERROR_PAGE + '?reason=parse');
   }
@@ -194,6 +195,14 @@ export async function onRequest(context) {
   if (willReturnDebug) {
     return new Response(JSON.stringify({
       ok: true,
+      parsed: {
+        name,
+        email,
+        message,
+        products_count: products.length,
+        first_product: products[0] || null,
+      },
+      content_type_received: request.headers.get('Content-Type'),
       admin_result: adminResult,
       reply_result: replyResult,
       gas_result: gasResult,
@@ -202,7 +211,7 @@ export async function onRequest(context) {
       reply_to: email,
     }, null, 2), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
     });
   }
 
