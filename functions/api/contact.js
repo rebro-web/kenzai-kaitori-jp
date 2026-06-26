@@ -42,10 +42,14 @@ export async function onRequest(context) {
   }
 
   // リファラチェック（同一ドメインから来てるか）
-  const referer = request.headers.get('Referer') || '';
+  // ※デバッグモード時はスキップ（?debug=1 がURLに付いていれば緩める）
   const url = new URL(request.url);
-  if (!referer.includes(url.host) && !referer.includes(SITE_DOMAIN)) {
-    return redirect(ERROR_PAGE + '?reason=referer');
+  const debugMode = url.searchParams.get('debug') === '1';
+  if (!debugMode) {
+    const referer = request.headers.get('Referer') || '';
+    if (!referer.includes(url.host) && !referer.includes(SITE_DOMAIN)) {
+      return redirect(ERROR_PAGE + '?reason=referer');
+    }
   }
 
   // フォームデータを取得
@@ -115,7 +119,7 @@ export async function onRequest(context) {
   const adminSubject = `${SITE_SHORT}へ${name}様から匿名査定がありました。商品：${firstProductName}`;
   const adminBody    = buildAdminBody({ now, name, email, message, products });
 
-  await sendMail(apiKey, {
+  const adminResult = await sendMail(apiKey, {
     from: `${FROM_NAME} <${FROM_EMAIL}>`,
     to: ADMIN_EMAILS,
     subject: adminSubject,
@@ -127,12 +131,27 @@ export async function onRequest(context) {
   const replySubject = `【${SITE_SHORT}】査定依頼を受け付けました`;
   const replyBody    = buildReplyBody({ name, email, message, products });
 
-  await sendMail(apiKey, {
+  const replyResult = await sendMail(apiKey, {
     from: `${FROM_NAME} <${FROM_EMAIL}>`,
     to: [email],
     subject: replySubject,
     text: replyBody,
   });
+
+  // デバッグモードならResendのレスポンスをそのまま返す
+  if (debugMode) {
+    return new Response(JSON.stringify({
+      ok: true,
+      admin_result: adminResult,
+      reply_result: replyResult,
+      from_email: FROM_EMAIL,
+      admin_emails: ADMIN_EMAILS,
+      reply_to: email,
+    }, null, 2), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
   // ============================================
   // スプレッドシート記録（GAS WebApp）
@@ -267,8 +286,11 @@ async function sendMail(apiKey, payload) {
       },
       body: JSON.stringify(payload),
     });
-    return await res.json();
+    const text = await res.text();
+    let body;
+    try { body = JSON.parse(text); } catch { body = text; }
+    return { status: res.status, body, to: payload.to };
   } catch (err) {
-    return { error: err.message };
+    return { error: err.message, to: payload.to };
   }
 }
