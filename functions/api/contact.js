@@ -127,6 +127,7 @@ export async function onRequest(context) {
     to: ADMIN_EMAILS,
     subject: adminSubject,
     text: adminBody,
+    html: toHtml(adminBody),
     reply_to: `${name} <${email}>`,
   });
 
@@ -142,6 +143,7 @@ export async function onRequest(context) {
     to: [replyTo],
     subject: replySubject + (email === VERIFIED_TESTING_EMAIL ? '' : `（本来宛先: ${email}）`),
     text: replyBody,
+    html: toHtml(replyBody),
   });
 
   // デバッグモードならレスポンスを返す（GAS結果は後段で含める）
@@ -293,14 +295,14 @@ https://${SITE_DOMAIN}/
 ────────────────────`;
 }
 
-// Resend API でメール送信
+// Resend API でメール送信（UTF-8明示）
 async function sendMail(apiKey, payload) {
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json; charset=utf-8',
       },
       body: JSON.stringify(payload),
     });
@@ -311,4 +313,15 @@ async function sendMail(apiKey, payload) {
   } catch (err) {
     return { error: err.message, to: payload.to };
   }
+}
+
+// プレーンテキスト → HTML（charset 明示のため）
+function toHtml(text) {
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+  return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"></head><body><pre style="font-family:'Hiragino Sans','Yu Gothic','Meiryo',sans-serif; font-size:14px; white-space:pre-wrap; word-wrap:break-word;">${escaped}</pre></body></html>`;
 }
